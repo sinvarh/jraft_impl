@@ -1,4 +1,4 @@
-package com.jraft;
+package main;
 
 public interface LifeCycle<T> {
     /**
