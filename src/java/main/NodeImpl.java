@@ -1,6 +1,7 @@
 package main;
 
 import main.Node;
+import main.entity.NodeStatus;
 import main.entity.Peer;
 
 import java.util.Map;
@@ -30,6 +31,7 @@ public class NodeImpl implements Node {
     /** 对于每一个服务器，已经复制给他的日志的最高索引值 */
     public Map<Peer, Long> matchIndexMap;
 
+    public int status = NodeStatus.FOLLOWER;
 
 
 }

@@ -65,7 +65,57 @@ public class ConsensusImpl implements Consensus{
         }
 
 
+        if(reqs.getTerm()>node.currentTerm){
+            node.status =NodeStatus.FOLLOWER;
+        }
 
-        return null;
+        node.currentTerm =reqs.getTerm();
+
+        //心跳
+        if(reqs.getEntries()==null||reqs.getEntries().isEmpty()){
+            res.setSuccess(true);
+            return res;
+        }
+        //不是心跳,非第一次
+        if(node.logModule.getLastIndex()!=0&&reqs.getPrevLogIndex()!=0){
+            LogEntry logEntry = node.logModule.read(reqs.getPrevLogIndex());
+            if(logEntry!=null){
+                // 如果日志在 prevLogIndex 位置处的日志条目的任期号和 prevLogTerm 不匹配，则返回 false
+                // 需要减小 nextIndex 重试.
+                if(logEntry.getTerm()!=reqs.getPrevLogTerm()){
+                    return res;
+                }
+            }else {
+                //index 不对，递减nextIndex
+                return res;
+            }
+        }
+
+        // 如果已经存在的日志条目和新的产生冲突（索引值相同但是任期号不同），删除这一条和之后所有的
+        LogEntry exitEntry = node.logModule.read(reqs.getPrevLogIndex()+1);
+        if(exitEntry!=null && exitEntry.getTerm()!= reqs.getEntries().get(0).getTerm()){
+            //删除这一条之后所有的
+            node.logModule.removeFromStartIndex(reqs.getPrevLogIndex()+1);
+        }else if(exitEntry!=null){
+            //日志已存在
+            res.setSuccess(true);
+            return res;
+        }
+
+        //写入到状态机中，同步写入
+        for (LogEntry logEntry:reqs.getEntries()) {
+            node.logModule.write(logEntry);
+            node.stateMachine.apply(logEntry);
+            res.setSuccess(true);
+        }
+
+        //如果 leaderCommit > commitIndex，令 commitIndex 等于 leaderCommit 和 新日志条目索引值中较小的一个
+        if(reqs.getLeaderCommit()>node.commitIndex){
+            int commitIndex = (int) Math.min(reqs.getLeaderCommit(),node.logModule.getLastIndex());
+            node.commitIndex = commitIndex;
+            node.lastApplied = commitIndex;
+        }
+
+        return res;
     }
 }

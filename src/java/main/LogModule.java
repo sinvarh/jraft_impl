@@ -20,4 +20,11 @@ public interface LogModule {
 
     long getLastIndex();
 
+    LogEntry read(Long index);
+
+    boolean removeFromStartIndex(Long startIndex);
+
+    void write(LogEntry logEntry);
+
+
 }
