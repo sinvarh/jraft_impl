@@ -37,7 +37,7 @@ public class ConsensusImpl implements Consensus{
         // 切换状态
         node.status = NodeStatus.FOLLOWER;
         // 更新
-        node.peerSet.setLeader(new Peer(reqs.getCandidateId()));
+//        node.peerSet.setLeader(new Peer(reqs.getCandidateId()));
         node.currentTerm = reqs.getTerm();
         node.voteFor = reqs.getCandidateId();
 
@@ -91,6 +91,7 @@ public class ConsensusImpl implements Consensus{
             }
         }
 
+        // 这里比较关键
         // 如果已经存在的日志条目和新的产生冲突（索引值相同但是任期号不同），删除这一条和之后所有的
         LogEntry exitEntry = node.logModule.read(reqs.getPrevLogIndex()+1);
         if(exitEntry!=null && exitEntry.getTerm()!= reqs.getEntries().get(0).getTerm()){
