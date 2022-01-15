@@ -5,6 +5,10 @@ import main.entity.*;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+
+import static main.entity.NodeStatus.LEADER;
 
 public class NodeImpl implements Node {
     /**
@@ -31,7 +35,10 @@ public class NodeImpl implements Node {
 
     public int status = NodeStatus.FOLLOWER;
 
-    public Set<Peer> setPeer;
+    /**
+     * 每个节点的地址
+     */
+    public Set<Peer> peerSet;
     /**
      * 成为了领导人需要用的的值
      */
@@ -45,18 +52,49 @@ public class NodeImpl implements Node {
 
     }
 
-
-
-    //处理投票请求
-    @Override
+    /**
+     *   处理投票请求
+     */
     public RequestVoteResp handlerRequestVote(RequestVoteReqs reqs) {
         return consensus.requestVote(reqs);
     }
 
-    //处理append请求
-    @Override
+    /**
+     * 处理append请求
+     */
+
     public AppendEntriesResp handleAppendEntries(AppendEntriesReqs reqs) {
         return consensus.appendEntries(reqs);
+    }
+
+    /**
+     * 处理客户端请求
+     * @param reqs
+     * @return
+     */
+    public KVResp handleClientRequest(KVReqs reqs) {
+
+        if(status!=LEADER){
+            return "";
+        }
+        //同步到所有的节点上
+        int quorum = 0;
+        for(Peer peer:peerSet){
+            CompletableFuture<Boolean> completableFuture = CompletableFuture.completedFuture()
+        }
+        //如果同步了大多数
+
+        if(){
+
+        }else {
+            //回滚
+        }
+        return null;
+    }
+
+    public Future<Boolean> appendEntriesRpc(Peer peer,LogEntry logEntry ){
+
+        AppendEntriesReqs appendEntriesReqs = new
     }
 
 }

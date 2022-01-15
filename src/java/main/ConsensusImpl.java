@@ -15,7 +15,6 @@ public class ConsensusImpl implements Consensus{
      * @param reqs
      * @return
      */
-    @Override
     public RequestVoteResp requestVote(RequestVoteReqs reqs) {
         if(reqs.getTerm()<node.currentTerm){
             return  RequestVoteResp.builder().term(reqs.getTerm()).voteGranted(false).build();
@@ -56,7 +55,6 @@ public class ConsensusImpl implements Consensus{
      * 追加日志中尚未存在的任何新条目
      * 如果领导人的已知已提交的最高日志条目的索引大于接收者的已知已提交最高日志条目的索引（leaderCommit > commitIndex），则把接收者的已知已经提交的最高的日志条目的索引commitIndex 重置为 领导人的已知已经提交的最高的日志条目的索引 leaderCommit 或者是 上一个新条目的索引 取两者的最小值
      */
-    @Override
     public AppendEntriesResp appendEntries(AppendEntriesReqs reqs) {
         AppendEntriesResp res = AppendEntriesResp.builder().term(reqs.getTerm()).success(false).build();
 
