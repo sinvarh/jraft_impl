@@ -2,6 +2,7 @@ package main;
 
 import main.Node;
 import main.entity.*;
+import main.rpc.RaftRpcServer;
 
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +53,12 @@ public class NodeImpl implements Node {
 
     }
 
+    public static void main(String[] args) {
+        new RaftRpcServer();
+        System.out.println("fuck u ");
+        System.out.println("fuc u 2");
+    }
+
     /**
      *   处理投票请求
      */
@@ -80,10 +87,10 @@ public class NodeImpl implements Node {
         //同步到所有的节点上
         int quorum = 0;
         for(Peer peer:peerSet){
+            //获取同步结果
             CompletableFuture<Boolean> completableFuture = CompletableFuture.completedFuture()
         }
         //如果同步了大多数
-
         if(){
 
         }else {
@@ -94,7 +101,9 @@ public class NodeImpl implements Node {
 
     public Future<Boolean> appendEntriesRpc(Peer peer,LogEntry logEntry ){
 
-        AppendEntriesReqs appendEntriesReqs = new
+        AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
+
+        return null;
     }
 
 }
