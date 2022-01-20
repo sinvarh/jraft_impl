@@ -36,10 +36,4 @@ public class RaftThreadPoolExecutor extends ThreadPoolExecutor {
         log.info("active count : {}, queueSize : {}, poolSize : {}", getActiveCount(), getQueue().size(), getPoolSize());
     }
 
-    public static void main(String[] args) {
-        RaftThreadPoolExecutor raftThreadPool = new RaftThreadPoolExecutor(10,10,60,TimeUnit.SECONDS,new ArrayBlockingQueue<>(1000), new AbortPolicy());
-        raftThreadPool.submit();
-
-    }
-
 }

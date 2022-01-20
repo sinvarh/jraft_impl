@@ -1,7 +1,11 @@
 package main.entity;
 
+import lombok.Data;
+import lombok.Getter;
+
 import java.util.Objects;
 
+@Getter
 public class Peer {
     @Override
     public String toString() {
