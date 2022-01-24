@@ -1,14 +1,22 @@
 package main;
 
+import com.alipay.remoting.rpc.RpcClient;
+import com.alipay.remoting.rpc.RpcServer;
 import main.Node;
+import main.config.RaftThreadPoolExecutor;
 import main.entity.*;
+import main.rpc.RaftRpcRequest;
 import main.rpc.RaftRpcServer;
+import main.rpc.RaftServerUsersProcessor;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
+import static main.entity.NodeStatus.FOLLOWER;
 import static main.entity.NodeStatus.LEADER;
 
 public class NodeImpl implements Node {
@@ -49,8 +57,28 @@ public class NodeImpl implements Node {
     /** 对于每一个服务器，已经复制给他的日志的最高索引值 */
     public Map<Peer, Long> matchIndexMap;
 
+
+    /**
+     * rpc client
+     */
+    public RpcClient rpcClient;
+
+    public RpcServer rpcServer;
+
+
+    public RaftThreadPoolExecutor raftThreadPoolExecutor;
     public void init(){
 
+    }
+
+    void  initRpcClient(){
+        // 1. create a rpc client
+        rpcClient = new RpcClient();
+        // 2. add processor for connect and close event if you need
+        RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor();
+        rpcClient.registerUserProcessor(raftServerUsersProcessor);
+        // 3. do init
+        rpcClient.startup();
     }
 
     public static void main(String[] args) {
@@ -88,11 +116,11 @@ public class NodeImpl implements Node {
         int quorum = 0;
         for(Peer peer:peerSet){
             //获取同步结果
-            CompletableFuture<Boolean> completableFuture = CompletableFuture.completedFuture()
+
         }
+        raftThreadPoolExecutor.invokeAll()
         //如果同步了大多数
         if(){
-
         }else {
             //回滚
         }
@@ -105,6 +133,42 @@ public class NodeImpl implements Node {
 
         return null;
     }
+
+    //
+    public Callable<Boolean> replicateResult(Peer p, List<LogEntry> entries){
+        return () -> {
+            RaftRpcRequest req = new RaftRpcRequest(2, "hello world sync");
+            AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
+            appendEntriesReqs.setEntries(entries);
+            appendEntriesReqs.setLeaderId();
+            appendEntriesReqs.setLeaderCommit();
+            //如果是第一次，沒有perIndex
+            appendEntriesReqs.setPrevLogIndex();
+            appendEntriesReqs.setPrevLogTerm();
+
+
+            //构造函数
+            AppendEntriesResp appendEntriesResp =  rpcClient.invokeSync(p.getAddr(), req, 3000);
+            if(appendEntriesResp.getTerm()>currentTerm){
+                //变成follower
+                status = FOLLOWER;
+                currentTerm = appendEntriesReqs.getTerm();
+                return false;
+            }
+
+            //if success
+            if(appendEntriesResp.getSuccess()){
+                return true;
+            }else{
+                //失败了，减少index 重试,循环重试
+                nextIndexMap.put();
+                matchIndexMap.put()
+                entries.add(0,);
+            }
+        }
+    };
+
+
 
 }
 
