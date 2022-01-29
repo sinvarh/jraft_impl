@@ -1,6 +1,6 @@
 package main;
 
-import main.entity.LogEntry;
+import main.model.log.LogEntry;
 
 import java.util.List;
 

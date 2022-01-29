@@ -2,10 +2,9 @@ package main;
 
 import com.alipay.remoting.rpc.RpcClient;
 import com.alipay.remoting.rpc.RpcServer;
-import main.Node;
 import main.config.RaftThreadPoolExecutor;
 import main.entity.*;
-import main.rpc.RaftRpcRequest;
+import main.model.rpc.common.RaftRpcReq;
 import main.rpc.RaftRpcServer;
 import main.rpc.RaftServerUsersProcessor;
 
@@ -13,11 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
-import static main.entity.NodeStatus.FOLLOWER;
-import static main.entity.NodeStatus.LEADER;
+import static main.config.NodeStatus.FOLLOWER;
+import static main.config.NodeStatus.LEADER;
 
 public class NodeImpl implements Node {
     /**
@@ -137,7 +135,7 @@ public class NodeImpl implements Node {
     //
     public Callable<Boolean> replicateResult(Peer p, List<LogEntry> entries){
         return () -> {
-            RaftRpcRequest req = new RaftRpcRequest(2, "hello world sync");
+            RaftRpcReq req = new RaftRpcReq(2, "hello world sync");
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
             appendEntriesReqs.setEntries(entries);
             appendEntriesReqs.setLeaderId();

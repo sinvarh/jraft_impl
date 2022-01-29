@@ -18,9 +18,10 @@ package main.rpc;
 
 import com.alipay.remoting.exception.RemotingException;
 import com.alipay.remoting.rpc.RpcClient;
+import main.model.rpc.common.RaftRpcReq;
 
 /**
- * a demo for rpc client, you can just run the main method after started rpc server of {@link RpcServerDemoByMain}
+ * a demo for rpc client, you can just run the main method after started rpc server of {@link }
  *
  * @author tsui
  * @version $Id: RpcClientDemoByMain.java, v 0.1 2018-04-10 10:39 tsui Exp $
@@ -44,10 +45,10 @@ public class RaftRpcClient {
 
     public static void main(String[] args) throws RemotingException, InterruptedException {
         new RaftRpcClient();
-        RaftRpcRequest req = new RaftRpcRequest(2, "hello world sync");
+        RaftRpcReq<String > req = new RaftRpcReq<>("hello world sync");
 
-            String res = (String) client.invokeSync(addr, req, 3000);
-            System.out.println("invoke sync result = [" + res + "]");
+        String res = (String) client.invokeSync(addr, req, 3000);
+        System.out.println("invoke sync result = [" + res + "]");
 
         client.shutdown();
     }

@@ -1,4 +1,4 @@
-package main.rpc;
+package main.config;
 
 public class Constants {
     //请求类型

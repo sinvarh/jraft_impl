@@ -1,7 +1,7 @@
 package main;
 
 
-import main.entity.LogEntry;
+import main.model.log.LogEntry;
 
 /**
  * 复制状态机interface

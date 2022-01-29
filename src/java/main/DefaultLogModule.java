@@ -3,7 +3,7 @@ package main;
 import com.alipay.sofa.rpc.common.json.JSON;
 
 import lombok.extern.slf4j.Slf4j;
-import main.entity.LogEntry;
+import main.model.log.LogEntry;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;

@@ -1,9 +1,9 @@
 package main;
 
-import main.entity.AppendEntriesReqs;
-import main.entity.AppendEntriesResp;
-import main.entity.RequestVoteReqs;
-import main.entity.RequestVoteResp;
+import main.model.rpc.AppendEntriesReqs;
+import main.model.rpc.AppendEntriesResp;
+import main.model.rpc.RequestVoteReqs;
+import main.model.rpc.RequestVoteResp;
 
 /**
  * raft 发起的请求
