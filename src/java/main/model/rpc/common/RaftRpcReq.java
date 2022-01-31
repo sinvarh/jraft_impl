@@ -7,7 +7,7 @@ import java.io.Serializable;
 
 @Data
 @AllArgsConstructor
-public class RaftRpcReq<T> implements Serializable {
+public class RaftRpcReq implements Serializable {
     /** for serialization */
     private static final long  serialVersionUID          = -1;
 
@@ -18,6 +18,6 @@ public class RaftRpcReq<T> implements Serializable {
     /**
      * 携带的数据
      */
-    private T data;
+    private Object data;
 
 }

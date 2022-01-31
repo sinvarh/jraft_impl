@@ -2,8 +2,15 @@ package main;
 
 import com.alipay.remoting.rpc.RpcClient;
 import com.alipay.remoting.rpc.RpcServer;
+import main.config.NodeStatus;
 import main.config.RaftThreadPoolExecutor;
-import main.entity.*;
+import main.model.app.KVReqs;
+import main.model.app.KVResp;
+import main.model.log.LogEntry;
+import main.model.rpc.AppendEntriesReqs;
+import main.model.rpc.AppendEntriesResp;
+import main.model.rpc.RequestVoteReqs;
+import main.model.rpc.RequestVoteResp;
 import main.model.rpc.common.RaftRpcReq;
 import main.rpc.RaftRpcServer;
 import main.rpc.RaftServerUsersProcessor;
@@ -45,15 +52,15 @@ public class NodeImpl implements Node {
     /**
      * 每个节点的地址
      */
-    public Set<Peer> peerSet;
+    public Set<main.entity.Peer> peerSet;
     /**
      * 成为了领导人需要用的的值
      */
     /** 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一） */
-    public Map<Peer, Long> nextIndexMap;
+    public Map<main.entity.Peer, Long> nextIndexMap;
 
     /** 对于每一个服务器，已经复制给他的日志的最高索引值 */
-    public Map<Peer, Long> matchIndexMap;
+    public Map<main.entity.Peer, Long> matchIndexMap;
 
 
     /**
@@ -88,6 +95,7 @@ public class NodeImpl implements Node {
     /**
      *   处理投票请求
      */
+    @Override
     public RequestVoteResp handlerRequestVote(RequestVoteReqs reqs) {
         return consensus.requestVote(reqs);
     }
@@ -96,6 +104,7 @@ public class NodeImpl implements Node {
      * 处理append请求
      */
 
+    @Override
     public AppendEntriesResp handleAppendEntries(AppendEntriesReqs reqs) {
         return consensus.appendEntries(reqs);
     }
@@ -105,6 +114,7 @@ public class NodeImpl implements Node {
      * @param reqs
      * @return
      */
+    @Override
     public KVResp handleClientRequest(KVReqs reqs) {
 
         if(status!=LEADER){
@@ -112,7 +122,7 @@ public class NodeImpl implements Node {
         }
         //同步到所有的节点上
         int quorum = 0;
-        for(Peer peer:peerSet){
+        for(main.entity.Peer peer:peerSet){
             //获取同步结果
 
         }
@@ -125,7 +135,7 @@ public class NodeImpl implements Node {
         return null;
     }
 
-    public Future<Boolean> appendEntriesRpc(Peer peer,LogEntry logEntry ){
+    public Future<Boolean> appendEntriesRpc(main.entity.Peer peer, LogEntry logEntry ){
 
         AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
 
@@ -133,7 +143,7 @@ public class NodeImpl implements Node {
     }
 
     //
-    public Callable<Boolean> replicateResult(Peer p, List<LogEntry> entries){
+    public Callable<Boolean> replicateResult(main.entity.Peer p, List<LogEntry> entries){
         return () -> {
             RaftRpcReq req = new RaftRpcReq(2, "hello world sync");
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();

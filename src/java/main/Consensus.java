@@ -7,6 +7,7 @@ import main.model.rpc.RequestVoteResp;
 
 /**
  * raft 发起的请求
+ * @author sinvar
  */
 public interface Consensus {
     /**

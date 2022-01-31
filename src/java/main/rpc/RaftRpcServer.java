@@ -17,6 +17,8 @@
 package main.rpc;
 
 
+import main.Consensus;
+
 /**
  * a demo for rpc server, you can just run the main method to start a server
  *
@@ -25,13 +27,11 @@ package main.rpc;
  */
 public class RaftRpcServer {
 
-    BoltServer                server;
-    int                       port                      = 8999;
-    RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor();
+    public RaftRpcServer(int port, Consensus consensus) {
+        RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor(consensus);
 
-    public RaftRpcServer() {
         // 1. create a Rpc server with port assigned
-        server = new BoltServer(port);
+        BoltServer server = new BoltServer(port);
         // 3. register user processor for client request
         server.registerUserProcessor(raftServerUsersProcessor);
         // 4. server start
@@ -43,7 +43,5 @@ public class RaftRpcServer {
         // server.getRpcServer().stop();
     }
 
-    public static void main(String[] args) {
-        new RaftRpcServer();
-    }
+
 }

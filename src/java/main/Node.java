@@ -1,6 +1,11 @@
 package main;
 
-import main.entity.*;
+import main.model.app.KVReqs;
+import main.model.app.KVResp;
+import main.model.rpc.AppendEntriesReqs;
+import main.model.rpc.AppendEntriesResp;
+import main.model.rpc.RequestVoteReqs;
+import main.model.rpc.RequestVoteResp;
 
 /**
  * node interface

@@ -16,10 +16,10 @@ import java.util.List;
 public class DefaultLogModule implements LogModule{
     private RocksDB db;
     private static final String lastIndexKey = "LAST_INDEX_KEY";
-    public DefaultLogModule(String port) {
+    public DefaultLogModule(int port) {
         //初始化连接
         final Options options = new Options().setCreateIfMissing(true);
-        String dbDir = "./rocksDB/testDB/"+port;
+        String dbDir = "./rocksDB/logDB/"+port;
         File file = new File(dbDir);
         if(!file.exists()){
             boolean res  = file.mkdirs();

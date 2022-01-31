@@ -1,6 +1,9 @@
 package main.model.rpc;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import main.model.log.LogEntry;
 
 import java.util.List;
@@ -9,6 +12,8 @@ import java.util.List;
  * 追加日志请求
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class AppendEntriesReqs {
     /**
      * 任期

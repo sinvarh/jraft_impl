@@ -1,13 +1,15 @@
 package main.model.rpc.common;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
-public class RaftRpcResp<T> implements Serializable {
+@AllArgsConstructor
+public class RaftRpcResp implements Serializable {
     private static final long  serialVersionUID          = -1;
 
-    private boolean res;
-    private T data;
+    private int code;
+    private Object data;
 }

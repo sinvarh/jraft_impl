@@ -28,28 +28,35 @@ import main.model.rpc.common.RaftRpcReq;
  */
 public class RaftRpcClient {
 
-    static RpcClient client;
-
-    static String             addr                      = "127.0.0.1:8999";
-
-    RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor();
-
-    public RaftRpcClient() {
-        // 1. create a rpc client
-        client = new RpcClient();
-        // 2. add processor for connect and close event if you need
-        client.registerUserProcessor(raftServerUsersProcessor);
-        // 3. do init
+    private static final RpcClient client =  new RpcClient();
+    static {
         client.startup();
     }
 
+    static String    addr                      = "127.0.0.1:8999";
+
+//    RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor();
+
+//    public RaftRpcClient() {
+//        // 1. create a rpc client
+//        client = new RpcClient();
+//        // 2. add processor for connect and close event if you need
+////        client.registerUserProcessor(raftServerUsersProcessor);
+//        // 3. do init
+//        client.startup();
+//    }
+
+    public static RpcClient getClient() {
+        return client;
+    }
+
     public static void main(String[] args) throws RemotingException, InterruptedException {
-        new RaftRpcClient();
-        RaftRpcReq<String > req = new RaftRpcReq<>("hello world sync");
-
-        String res = (String) client.invokeSync(addr, req, 3000);
-        System.out.println("invoke sync result = [" + res + "]");
-
-        client.shutdown();
+//        new RaftRpcClient();
+//        RaftRpcReq req = new RaftRpcReq("hello world sync");
+//
+//        String res = (String) client.invokeSync(addr, req, 3000);
+//        System.out.println("invoke sync result = [" + res + "]");
+//
+//        client.shutdown();
     }
 }
