@@ -2,6 +2,7 @@ package main;
 
 import com.alipay.remoting.rpc.RpcClient;
 import com.alipay.remoting.rpc.RpcServer;
+import main.config.Metadata;
 import main.config.NodeStatus;
 import main.config.RaftThreadPoolExecutor;
 import main.model.app.KVReqs;
@@ -12,28 +13,18 @@ import main.model.rpc.AppendEntriesResp;
 import main.model.rpc.RequestVoteReqs;
 import main.model.rpc.RequestVoteResp;
 import main.model.rpc.common.RaftRpcReq;
+import main.rpc.RaftRpcClient;
 import main.rpc.RaftRpcServer;
 import main.rpc.RaftServerUsersProcessor;
+import main.entity.Peer;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
+import java.util.*;
+import java.util.concurrent.*;
 
 import static main.config.NodeStatus.FOLLOWER;
 import static main.config.NodeStatus.LEADER;
 
 public class NodeImpl implements Node {
-    /**
-     * 服务器已知最新的任期
-     */
-    public int currentTerm;
-
-    /**
-     *votedFor	当前任期内收到选票的 candidateId，如果没有投给任何候选人 则为空
-     */
-    public String voteFor;
 
     public LogModule logModule;
 
@@ -41,10 +32,14 @@ public class NodeImpl implements Node {
 
     public Consensus consensus;
 
-    /** 已知的最大的已经被提交的日志条目的索引值 */
+    /**
+     * 已知的最大的已经被提交的日志条目的索引值
+     */
     public long commitIndex;
 
-    /** 最后被应用到状态机的日志条目索引值（初始化为 0，持续递增) */
+    /**
+     * 最后被应用到状态机的日志条目索引值（初始化为 0，持续递增)
+     */
     public long lastApplied = 0;
 
     public int status = NodeStatus.FOLLOWER;
@@ -52,48 +47,53 @@ public class NodeImpl implements Node {
     /**
      * 每个节点的地址
      */
-    public Set<main.entity.Peer> peerSet;
+    public Set<Peer> peerSet;
     /**
      * 成为了领导人需要用的的值
      */
-    /** 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一） */
-    public Map<main.entity.Peer, Long> nextIndexMap;
+    /**
+     * 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
+     */
+    public Map<Peer, Long> nextIndexMap;
 
-    /** 对于每一个服务器，已经复制给他的日志的最高索引值 */
-    public Map<main.entity.Peer, Long> matchIndexMap;
+    /**
+     * 对于每一个服务器，已经复制给他的日志的最高索引值
+     */
+    public Map<Peer, Long> matchIndexMap;
 
 
     /**
      * rpc client
      */
-    public RpcClient rpcClient;
+    public RpcClient raftRpcClient;
 
-    public RpcServer rpcServer;
+    public RaftRpcServer raftRpcServer;
 
 
     public RaftThreadPoolExecutor raftThreadPoolExecutor;
-    public void init(){
 
+    public void init(int port) {
+        logModule = new DefaultLogModule(port);
+        stateMachine = new StateMachineImpl(port);
+        consensus = new ConsensusImpl(logModule, stateMachine);
+
+        //rpc 模块初始化
+        raftRpcServer = new RaftRpcServer(port, consensus);
+        raftRpcClient = RaftRpcClient.getClient();
+
+        //todo 优化参数
+        raftThreadPoolExecutor = new RaftThreadPoolExecutor(10, 10, 600,
+                TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
     }
 
-    void  initRpcClient(){
-        // 1. create a rpc client
-        rpcClient = new RpcClient();
-        // 2. add processor for connect and close event if you need
-        RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor();
-        rpcClient.registerUserProcessor(raftServerUsersProcessor);
-        // 3. do init
-        rpcClient.startup();
-    }
 
     public static void main(String[] args) {
-        new RaftRpcServer();
         System.out.println("fuck u ");
         System.out.println("fuc u 2");
     }
 
     /**
-     *   处理投票请求
+     * 处理投票请求
      */
     @Override
     public RequestVoteResp handlerRequestVote(RequestVoteReqs reqs) {
@@ -111,31 +111,44 @@ public class NodeImpl implements Node {
 
     /**
      * 处理客户端请求
+     *
      * @param reqs
      * @return
      */
     @Override
     public KVResp handleClientRequest(KVReqs reqs) {
 
-        if(status!=LEADER){
-            return "";
+        if (status != LEADER) {
+            return new KVResp(-1, "not leader");
         }
         //同步到所有的节点上
         int quorum = 0;
-        for(main.entity.Peer peer:peerSet){
-            //获取同步结果
-
+        List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
+        for (Peer peer : peerSet) {
+            // todo index term
+            callableList.add(replicateResult(peer, new LogEntry(1L, 1,
+                    new LogEntry.Command(reqs.getKey(), reqs.getValue()))));
         }
-        raftThreadPoolExecutor.invokeAll()
+        try {
+            List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
+            for (Future<Boolean> res : resList) {
+                if (res.get()) {
+                    quorum++;
+                }
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         //如果同步了大多数
-        if(){
-        }else {
+        if (quorum > peerSet.size() / 2) {
+
+        } else {
             //回滚
         }
         return null;
     }
 
-    public Future<Boolean> appendEntriesRpc(main.entity.Peer peer, LogEntry logEntry ){
+    public Future<Boolean> appendEntriesRpc(Peer peer, LogEntry logEntry) {
 
         AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
 
@@ -143,39 +156,39 @@ public class NodeImpl implements Node {
     }
 
     //
-    public Callable<Boolean> replicateResult(main.entity.Peer p, List<LogEntry> entries){
+    public Callable<Boolean> replicateResult(Peer p, LogEntry logEntry) {
         return () -> {
             RaftRpcReq req = new RaftRpcReq(2, "hello world sync");
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
-            appendEntriesReqs.setEntries(entries);
+            appendEntriesReqs.setEntries(Collections.singletonList(logEntry));
             appendEntriesReqs.setLeaderId();
-            appendEntriesReqs.setLeaderCommit();
-            //如果是第一次，沒有perIndex
-            appendEntriesReqs.setPrevLogIndex();
-            appendEntriesReqs.setPrevLogTerm();
+            appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
+            //如果是第一次，perIndex是0
+            appendEntriesReqs.setPrevLogIndex(logModule.);
+            appendEntriesReqs.setPrevLogTerm(logModule.ge);
 
 
             //构造函数
-            AppendEntriesResp appendEntriesResp =  rpcClient.invokeSync(p.getAddr(), req, 3000);
-            if(appendEntriesResp.getTerm()>currentTerm){
+            AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
+            if (appendEntriesResp.getTerm() > Metadata.currentTerm) {
                 //变成follower
                 status = FOLLOWER;
-                currentTerm = appendEntriesReqs.getTerm();
+                Metadata.currentTerm = appendEntriesReqs.getTerm();
                 return false;
             }
 
             //if success
-            if(appendEntriesResp.getSuccess()){
+            if (appendEntriesResp.getSuccess()) {
                 return true;
-            }else{
+            } else {
                 //失败了，减少index 重试,循环重试
                 nextIndexMap.put();
-                matchIndexMap.put()
-                entries.add(0,);
+                matchIndexMap.put();
             }
         }
-    };
+    }
 
+    ;
 
 
 }
