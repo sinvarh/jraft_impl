@@ -50,13 +50,4 @@ public class RaftRpcClient {
         return client;
     }
 
-    public static void main(String[] args) throws RemotingException, InterruptedException {
-//        new RaftRpcClient();
-//        RaftRpcReq req = new RaftRpcReq("hello world sync");
-//
-//        String res = (String) client.invokeSync(addr, req, 3000);
-//        System.out.println("invoke sync result = [" + res + "]");
-//
-//        client.shutdown();
-    }
 }
