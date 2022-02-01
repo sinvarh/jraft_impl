@@ -13,19 +13,20 @@ import java.util.List;
 
 @Slf4j
 //todo 这里的写会有并发问题
-public class DefaultLogModule implements LogModule{
+public class DefaultLogModule implements LogModule {
     private RocksDB db;
-    private static final String lastIndexKey = "LAST_INDEX_KEY";
+    private static final String lastIndexKey = "LAST_INDEX";
+
     public DefaultLogModule(int port) {
         //初始化连接
         final Options options = new Options().setCreateIfMissing(true);
-        String dbDir = "./rocksDB/logDB/"+port;
+        String dbDir = "./rocksDB/logDB/" + port;
         File file = new File(dbDir);
-        if(!file.exists()){
-            boolean res  = file.mkdirs();
-            if(res){
+        if (!file.exists()) {
+            boolean res = file.mkdirs();
+            if (res) {
                 log.info("create file success");
-            }else{
+            } else {
                 log.error("create file error");
                 return;
             }
@@ -34,13 +35,13 @@ public class DefaultLogModule implements LogModule{
         try {
             db = RocksDB.open(options, dbDir);
         } catch (RocksDBException e) {
-            log.error("init db error",e);
+            log.error("init db error", e);
         }
     }
 
     @Override
     public void appendEntries(List<LogEntry> entries) {
-        for(LogEntry entry: entries){
+        for (LogEntry entry : entries) {
             write(entry);
         }
     }
@@ -49,13 +50,13 @@ public class DefaultLogModule implements LogModule{
     public LogEntry getLast() {
         try {
             byte[] res = db.get(lastIndexKey.getBytes());
-            if(res==null){
+            if (res == null) {
                 return null;
-            }else{
-              return read(Utils.bytesToLong(res));
+            } else {
+                return read(Utils.bytesToLong(res));
             }
         } catch (Exception e) {
-            log.error("get last",e);
+            log.error("get last", e);
         }
         return null;
     }
@@ -63,9 +64,9 @@ public class DefaultLogModule implements LogModule{
     @Override
     public long getLastIndex() {
         LogEntry logEntry = getLast();
-        if(logEntry==null) {
+        if (logEntry == null) {
             return 0;
-        }else{
+        } else {
             return logEntry.getIndex();
         }
     }
@@ -73,10 +74,13 @@ public class DefaultLogModule implements LogModule{
     @Override
     public LogEntry read(Long index) {
         try {
-            byte[]  res = db.get(Utils.longToBytes(index));
-            return JSON.parseObject(new String(res),LogEntry.class);
-        } catch (RocksDBException e) {
-            e.printStackTrace();
+            byte[] res = db.get(Utils.longToBytes(index));
+            if (res == null) {
+                return null;
+            }
+            return JSON.parseObject(new String(res), LogEntry.class);
+        } catch (Exception e) {
+            log.error("read error", e);
         }
         return null;
     }
@@ -89,13 +93,13 @@ public class DefaultLogModule implements LogModule{
 
     @Override
     public void write(LogEntry logEntry) {
-        byte[] key =Utils.longToBytes(logEntry.getIndex());
+        byte[] key = Utils.longToBytes(logEntry.getIndex());
         byte[] lastIndexKeyByte = lastIndexKey.getBytes();
         try {
             db.put(key, JSON.toJSONString(logEntry).getBytes());
-            db.put(lastIndexKeyByte,Utils.longToBytes(logEntry.getIndex()));
+            db.put(lastIndexKeyByte, Utils.longToBytes(logEntry.getIndex()));
         } catch (RocksDBException e) {
-            log.error("error",e);
+            log.error("error", e);
         }
     }
 }
