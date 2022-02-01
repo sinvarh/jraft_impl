@@ -43,7 +43,9 @@ public class SofaRpcTest {
         AppendEntriesReqs reqs = new AppendEntriesReqs(1, "127.0.0.1:9001", 0, 1, list, 1);
 
         RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), reqs);
-        RaftRpcClient.getClient().invokeSync(addr, req, 3000);
+        RaftRpcClient.getClient().invokeSync(addr, req, 300000);
+
+        RaftRpcClient.getClient().shutdown();
     }
 
 
