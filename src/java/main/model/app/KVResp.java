@@ -1,6 +1,8 @@
 package main.model.app;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * @program: jraft
@@ -9,6 +11,8 @@ import lombok.Data;
  * @create: 2022-01-10 13:23
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class KVResp {
     private int code;
     private String msg;

@@ -2,11 +2,15 @@ package main.model.rpc;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
  * 选举的请求
+ * @author sinvar
  */
 @Data
-public class RequestVoteReqs {
+public class RequestVoteReqs implements Serializable {
+    private static final long serialVersionUID = -7132772098280045823L;
     /**
      * 任期
      */

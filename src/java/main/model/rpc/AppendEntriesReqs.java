@@ -6,15 +6,17 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import main.model.log.LogEntry;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
  * 追加日志请求
+ * @author sinvar
  */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class AppendEntriesReqs {
+public class AppendEntriesReqs implements Serializable {
     /**
      * 任期
      */

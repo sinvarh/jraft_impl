@@ -3,12 +3,17 @@ package main.model.rpc;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
  * 追加日志的结果
+ *
+ * @author sinvar
  */
 @Data
 @Builder
-public class AppendEntriesResp {
+public class AppendEntriesResp implements Serializable {
+    private static final long serialVersionUID = 1736697706911983935L;
     /**
      * 当前任期，对于领导人而言 它会更新自己的任期
      */
