@@ -24,7 +24,12 @@ import java.util.concurrent.*;
 import static main.config.NodeStatus.FOLLOWER;
 import static main.config.NodeStatus.LEADER;
 
+/**
+ * @author sinvar
+ */
 public class NodeImpl implements Node {
+
+    private String addr;
 
     public LogModule logModule;
 
@@ -121,15 +126,22 @@ public class NodeImpl implements Node {
         if (status != LEADER) {
             return new KVResp(-1, "not leader");
         }
+
+        LogEntry logEntry = new LogEntry(Metadata.commitIndex + 1, Metadata.currentTerm,
+                new LogEntry.Command(reqs.getKey(), reqs.getValue()));
+        //写入log
+        logModule.write(logEntry);
+
         //同步到所有的节点上
         int quorum = 0;
         List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
         for (Peer peer : peerSet) {
-            // todo index term
-            callableList.add(replicateResult(peer, new LogEntry(1L, 1,
-                    new LogEntry.Command(reqs.getKey(), reqs.getValue()))));
+//            long nextIndex = nextIndexMap.get(peer);
+//            LogEntry logEntry = logModule.read(nextIndex);
+            callableList.add(replicateResult(peer, logEntry));
         }
         try {
+            //线程池invoke all
             List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
             for (Future<Boolean> res : resList) {
                 if (res.get()) {
@@ -139,13 +151,20 @@ public class NodeImpl implements Node {
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
         }
+        //upgrade commitIndex;
+        updateCommitIndex();
+
         //如果同步了大多数
         if (quorum > peerSet.size() / 2) {
-
+            //应用到状态机上
+            stateMachine.apply(logEntry);
+            commitIndex = logEntry.getIndex();
         } else {
             //回滚
+            logModule.removeFromStartIndex(logEntry.getIndex());
+            return new KVResp(-1, "没有获得半数同意");
         }
-        return null;
+        return new KVResp(0, "success");
     }
 
     public Future<Boolean> appendEntriesRpc(Peer peer, LogEntry logEntry) {
@@ -155,17 +174,22 @@ public class NodeImpl implements Node {
         return null;
     }
 
-    //
-    public Callable<Boolean> replicateResult(Peer p, LogEntry logEntry) {
+    // 复制到其他机器上
+    private Callable<Boolean> replicateResult(Peer p, LogEntry logEntry) {
         return () -> {
             RaftRpcReq req = new RaftRpcReq(2, "hello world sync");
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
             appendEntriesReqs.setEntries(Collections.singletonList(logEntry));
-            appendEntriesReqs.setLeaderId();
+            appendEntriesReqs.setLeaderId(addr);
             appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
             //如果是第一次，perIndex是0
-            appendEntriesReqs.setPrevLogIndex(logModule.);
-            appendEntriesReqs.setPrevLogTerm(logModule.ge);
+            LogEntry preLogEntry = logModule.read(logEntry.getIndex() - 1);
+            if (preLogEntry != null) {
+                appendEntriesReqs.setPrevLogIndex(preLogEntry.getIndex());
+                appendEntriesReqs.setPrevLogTerm(preLogEntry.getTerm());
+            } else {
+                appendEntriesReqs.setPrevLogIndex(0);
+            }
 
 
             //构造函数
@@ -179,17 +203,36 @@ public class NodeImpl implements Node {
 
             //if success
             if (appendEntriesResp.getSuccess()) {
+                nextIndexMap.put(p, logEntry.getIndex() + 1);
+                matchIndexMap.put(p, logEntry.getIndex());
                 return true;
             } else {
                 //失败了，减少index 重试,循环重试
-                nextIndexMap.put();
-                matchIndexMap.put();
+                if (logEntry.getIndex() - 1 > 0) {
+                    nextIndexMap.put(p, logEntry.getIndex() - 1);
+                } else {
+                    nextIndexMap.put(p, 1L);
+                }
+                return false;
+            }
+
+        };
+    }
+
+    //upgrade commitIndex
+    void updateCommitIndex() {
+        ArrayList<Long> list = new ArrayList<>(matchIndexMap.values());
+        Collections.sort(list);
+        Long index = list.get(list.size() / 2);
+        if (index > 0) {
+            LogEntry logEntry = logModule.read(index);
+            if (logEntry != null) {
+                if (logEntry.getTerm() == Metadata.currentTerm) {
+                    commitIndex = index;
+                }
             }
         }
     }
-
-    ;
-
 
 }
 

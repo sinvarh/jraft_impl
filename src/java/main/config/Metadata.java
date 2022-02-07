@@ -19,7 +19,8 @@ public class Metadata {
     public static String voteFor;
 
     /**
-     * 已知的最大的已经被提交的日志条目的索引值
+     * 已知的最大的已经被提交的日志条目的索引值，
+     * 啥时候更新这个值，更新这个值的时间点
      */
     public static long commitIndex;
 
