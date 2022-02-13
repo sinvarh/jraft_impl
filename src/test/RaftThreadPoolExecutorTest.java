@@ -12,10 +12,14 @@ import java.util.concurrent.*;
 public class RaftThreadPoolExecutorTest {
     private RaftThreadPoolExecutor raftThreadPoolExecutor;
 
+    private CountDownLatch countDownLatch;
+
     @Before
     public void setUp(){
         raftThreadPoolExecutor = new RaftThreadPoolExecutor(10,10,600,
                 TimeUnit.SECONDS,new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
+
+        countDownLatch = new CountDownLatch(100);
     }
 
     @Test
@@ -38,4 +42,31 @@ public class RaftThreadPoolExecutorTest {
         List<Future<Boolean>>  futures = raftThreadPoolExecutor.invokeAll(callableList);
         System.out.println(System.currentTimeMillis()-time);
     }
+
+
+    volatile long current;
+    @Test
+    public void testScheduleAtFixedRate() throws InterruptedException {
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+
+        current = System.currentTimeMillis();
+        executor.scheduleAtFixedRate(
+                new Runnable() {
+                    @SneakyThrows
+                    @Override
+                    public void run() {
+                        Thread.sleep(1000);
+                        System.out.println("aaaa");
+                        System.out.println(System.currentTimeMillis() - current);
+                        current = System.currentTimeMillis();
+                        countDownLatch.countDown();
+                    }
+                },
+                5,
+                5,
+                TimeUnit.SECONDS);
+
+
+    }
+
 }

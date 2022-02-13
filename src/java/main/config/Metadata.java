@@ -1,5 +1,4 @@
 package main.config;
-
 /**
  * @program: jraft
  * @description: 存放状态机相关的数据
@@ -33,4 +32,14 @@ public class Metadata {
      * 当前状态
      */
     public static int status = NodeStatus.FOLLOWER;
+
+    /**
+     * leader 地址
+     */
+    public static String leaderAddr;
+
+    /**
+     *自己的地址
+     */
+    public static String addr;
 }

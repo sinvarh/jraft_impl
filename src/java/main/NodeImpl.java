@@ -2,9 +2,12 @@ package main;
 
 import com.alipay.remoting.rpc.RpcClient;
 import com.alipay.remoting.rpc.RpcServer;
+import lombok.extern.slf4j.Slf4j;
 import main.config.Metadata;
 import main.config.NodeStatus;
 import main.config.RaftThreadPoolExecutor;
+import main.constant.CommandType;
+import main.constant.Constants;
 import main.model.app.KVReqs;
 import main.model.app.KVResp;
 import main.model.log.LogEntry;
@@ -17,7 +20,9 @@ import main.rpc.RaftRpcClient;
 import main.rpc.RaftRpcServer;
 import main.rpc.RaftServerUsersProcessor;
 import main.entity.Peer;
+import org.apache.log4j.BasicConfigurator;
 
+import java.time.Period;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -27,9 +32,8 @@ import static main.config.NodeStatus.LEADER;
 /**
  * @author sinvar
  */
+@Slf4j
 public class NodeImpl implements Node {
-
-    private String addr;
 
     public LogModule logModule;
 
@@ -62,7 +66,7 @@ public class NodeImpl implements Node {
     public Map<Peer, Long> nextIndexMap;
 
     /**
-     * 对于每一个服务器，已经复制给他的日志的最高索引值
+     * 对于每一个服务器，已经复制给他的日志的最高索引值。用来更新commitIndex
      */
     public Map<Peer, Long> matchIndexMap;
 
@@ -77,6 +81,9 @@ public class NodeImpl implements Node {
 
     public RaftThreadPoolExecutor raftThreadPoolExecutor;
 
+    //todo 重试队列
+    public LinkedBlockingQueue<String> linkedBlockingQueue;
+
     public void init(int port) {
         logModule = new DefaultLogModule(port);
         stateMachine = new StateMachineImpl(port);
@@ -89,12 +96,67 @@ public class NodeImpl implements Node {
         //todo 优化参数
         raftThreadPoolExecutor = new RaftThreadPoolExecutor(10, 10, 600,
                 TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
+
+        ScheduledThreadPoolExecutor heartbeatExecutor = new ScheduledThreadPoolExecutor(3);
+        ScheduledThreadPoolExecutor timeOutExecutor = new ScheduledThreadPoolExecutor(3);
+
+        Peer peer1 = new Peer("127.0.0.1:9902");
+        Peer peer2 = new Peer("127.0.0.1:9903");
+        Peer peer3 = new Peer("127.0.0.1:9903");
+        peerSet  = new HashSet<>();
+        peerSet.add(peer1);
+        peerSet.add(peer2);
+        peerSet.add(peer3);
+
+        heartbeatExecutor.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
+                for (Peer peer : peerSet) {
+                    callableList.add(heartBeatResult(peer));
+                }
+                try {
+                    List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
+                    for(Future<Boolean> heartBeatRes :resList){
+                       if(heartBeatRes.get()){
+                           //todo 重试
+                           log.error("error");
+                       };
+                    }
+                } catch (Exception e) {
+                    log.error("heart invoke all error");
+                }
+            }
+        },1000,1000,TimeUnit.MICROSECONDS);
+        timeOutExecutor.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                log.info("timeout");
+                List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
+                for (Peer peer : peerSet) {
+                    callableList.add(voteResult(peer));
+                }
+                try {
+                    List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
+                    for(Future<Boolean> heartBeatRes :resList){
+                        if(!heartBeatRes.get()){
+                            //todo 重试
+                            log.error("rpc res false error");
+                        };
+                    }
+                } catch (Exception e) {
+                    log.error("heart invoke all error");
+                }
+            }
+        },0,1,TimeUnit.SECONDS);
     }
 
 
     public static void main(String[] args) {
-        System.out.println("fuck u ");
-        System.out.println("fuc u 2");
+        BasicConfigurator.configure();
+        NodeImpl node = new NodeImpl();
+        node.init(9901);
+
     }
 
     /**
@@ -136,12 +198,13 @@ public class NodeImpl implements Node {
         int quorum = 0;
         List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
         for (Peer peer : peerSet) {
+            //todo 排除自己
 //            long nextIndex = nextIndexMap.get(peer);
 //            LogEntry logEntry = logModule.read(nextIndex);
             callableList.add(replicateResult(peer, logEntry));
         }
         try {
-            //线程池invoke all
+            //线程池invoke all,todo// 这里面实现也是循环等待
             List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
             for (Future<Boolean> res : resList) {
                 if (res.get()) {
@@ -167,20 +230,14 @@ public class NodeImpl implements Node {
         return new KVResp(0, "success");
     }
 
-    public Future<Boolean> appendEntriesRpc(Peer peer, LogEntry logEntry) {
-
-        AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
-
-        return null;
-    }
 
     // 复制到其他机器上
     private Callable<Boolean> replicateResult(Peer p, LogEntry logEntry) {
         return () -> {
-            RaftRpcReq req = new RaftRpcReq(2, "hello world sync");
+
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
             appendEntriesReqs.setEntries(Collections.singletonList(logEntry));
-            appendEntriesReqs.setLeaderId(addr);
+            appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
             appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
             //如果是第一次，perIndex是0
             LogEntry preLogEntry = logModule.read(logEntry.getIndex() - 1);
@@ -191,13 +248,13 @@ public class NodeImpl implements Node {
                 appendEntriesReqs.setPrevLogIndex(0);
             }
 
-
+            RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), appendEntriesReqs);
             //构造函数
             AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
             if (appendEntriesResp.getTerm() > Metadata.currentTerm) {
                 //变成follower
                 status = FOLLOWER;
-                Metadata.currentTerm = appendEntriesReqs.getTerm();
+                Metadata.currentTerm = appendEntriesResp.getTerm();
                 return false;
             }
 
@@ -217,6 +274,59 @@ public class NodeImpl implements Node {
             }
 
         };
+    }
+
+
+    private Callable<Boolean> heartBeatResult(Peer p){
+        return () -> {
+            if(Metadata.status== NodeStatus.LEADER) {
+                AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
+                appendEntriesReqs.setTerm(Metadata.currentTerm);
+                appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
+                appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
+
+                RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), appendEntriesReqs);
+                try {
+                    AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
+                    if(appendEntriesResp.getSuccess()){
+                        return true;
+                    }
+                } catch (Exception e) {
+                    log.error("心跳远程调用error", e);
+                }
+            }else{
+                log.info("not leader");
+            }
+            return false;
+        };
+    }
+
+    private Callable<Boolean> voteResult(Peer p){
+        return () -> {
+            if(Metadata.status==NodeStatus.FOLLOWER){
+                RequestVoteReqs requestVoteReqs = new RequestVoteReqs();
+                requestVoteReqs.setTerm(Metadata.currentTerm+1);
+                requestVoteReqs.setCandidateId(Metadata.addr);
+                requestVoteReqs.setLastLogIndex(Metadata.commitIndex);
+
+                LogEntry logEntry = logModule.read(Metadata.commitIndex);
+                if(logEntry!=null) {
+                    requestVoteReqs.setLastLogTerm(logEntry.getTerm());
+                }
+                RaftRpcReq req = new RaftRpcReq(CommandType.vote.getType(), requestVoteReqs);
+
+                try {
+                    RequestVoteResp voteResp = (RequestVoteResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
+                    if(voteResp.getVoteGranted()){
+                        return true;
+                    }
+                } catch (Exception e) {
+                    log.error("心跳远程调用error", e);
+                }
+            }
+            return false;
+        };
+
     }
 
     //upgrade commitIndex
