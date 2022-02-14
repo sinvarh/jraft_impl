@@ -25,6 +25,7 @@ import org.apache.log4j.BasicConfigurator;
 import java.time.Period;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static main.config.NodeStatus.FOLLOWER;
 import static main.config.NodeStatus.LEADER;
@@ -84,7 +85,12 @@ public class NodeImpl implements Node {
     //todo 重试队列
     public LinkedBlockingQueue<String> linkedBlockingQueue;
 
-    public void init(int port) {
+    private  long lastHeartBeatTime = 0;
+    ReentrantLock reentrantLock = new ReentrantLock();
+    //10s 超时
+    private static final long timeout = 9000;
+
+    public void init(int port,Set<Peer> peerSet) {
         logModule = new DefaultLogModule(port);
         stateMachine = new StateMachineImpl(port);
         consensus = new ConsensusImpl(logModule, stateMachine);
@@ -97,20 +103,19 @@ public class NodeImpl implements Node {
         raftThreadPoolExecutor = new RaftThreadPoolExecutor(10, 10, 600,
                 TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
 
-        ScheduledThreadPoolExecutor heartbeatExecutor = new ScheduledThreadPoolExecutor(3);
-        ScheduledThreadPoolExecutor timeOutExecutor = new ScheduledThreadPoolExecutor(3);
+        ScheduledThreadPoolExecutor heartbeatExecutor = new ScheduledThreadPoolExecutor(1);
+        ScheduledThreadPoolExecutor timeOutExecutor = new ScheduledThreadPoolExecutor(1);
 
-        Peer peer1 = new Peer("127.0.0.1:9902");
-        Peer peer2 = new Peer("127.0.0.1:9903");
-        Peer peer3 = new Peer("127.0.0.1:9903");
-        peerSet  = new HashSet<>();
-        peerSet.add(peer1);
-        peerSet.add(peer2);
-        peerSet.add(peer3);
+        this.peerSet = peerSet;
+
 
         heartbeatExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
+                if(Metadata.status!= LEADER){
+                    log.info("heartbeat,not leader");
+                    return ;
+                }
                 List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
                 for (Peer peer : peerSet) {
                     callableList.add(heartBeatResult(peer));
@@ -127,10 +132,11 @@ public class NodeImpl implements Node {
                     log.error("heart invoke all error");
                 }
             }
-        },1000,1000,TimeUnit.MICROSECONDS);
+        },1000,5,TimeUnit.SECONDS);
         timeOutExecutor.scheduleWithFixedDelay(new Runnable() {
             @Override
             public void run() {
+                if(System.currentTimeMillis()-lastHeartBeatTime>timeout){
                 log.info("timeout");
                 List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
                 for (Peer peer : peerSet) {
@@ -147,15 +153,25 @@ public class NodeImpl implements Node {
                 } catch (Exception e) {
                     log.error("heart invoke all error");
                 }
-            }
-        },0,1,TimeUnit.SECONDS);
+            }}
+        },0,10,TimeUnit.SECONDS);
     }
 
 
     public static void main(String[] args) {
         BasicConfigurator.configure();
         NodeImpl node = new NodeImpl();
-        node.init(9901);
+        Set<Peer> peers = new HashSet<>();
+//        peers.add(new Peer("127.0.0.1:9001"));
+//        peers.add(new Peer("127.0.0.1:9002"));
+//        peers.add(new Peer("127.0.0.1:9003"));
+        String port = args[0];
+        for(int i =1;i<args.length;i++){
+            if(!args[i].contains(port)) {
+                peers.add(new Peer(args[i]));
+            }
+        }
+        node.init(Integer.parseInt(port),peers);
 
     }
 
@@ -279,7 +295,6 @@ public class NodeImpl implements Node {
 
     private Callable<Boolean> heartBeatResult(Peer p){
         return () -> {
-            if(Metadata.status== NodeStatus.LEADER) {
                 AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
                 appendEntriesReqs.setTerm(Metadata.currentTerm);
                 appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
@@ -289,14 +304,18 @@ public class NodeImpl implements Node {
                 try {
                     AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
                     if(appendEntriesResp.getSuccess()){
+
+                        reentrantLock.lock();
+                        long currentTime = System.currentTimeMillis();
+                        lastHeartBeatTime = Math.max(currentTime,lastHeartBeatTime);
+                        reentrantLock.unlock();
+
                         return true;
                     }
                 } catch (Exception e) {
                     log.error("心跳远程调用error", e);
                 }
-            }else{
-                log.info("not leader");
-            }
+
             return false;
         };
     }
