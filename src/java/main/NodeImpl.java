@@ -27,8 +27,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static main.config.NodeStatus.FOLLOWER;
-import static main.config.NodeStatus.LEADER;
+import static main.config.NodeStatus.*;
 
 /**
  * @author sinvar
@@ -85,8 +84,8 @@ public class NodeImpl implements Node {
     //todo 重试队列
     public LinkedBlockingQueue<String> linkedBlockingQueue;
 
-    private  long lastHeartBeatTime = 0;
-    ReentrantLock reentrantLock = new ReentrantLock();
+
+
     //10s 超时
     private static final long timeout = 9000;
 
@@ -103,12 +102,15 @@ public class NodeImpl implements Node {
         raftThreadPoolExecutor = new RaftThreadPoolExecutor(10, 10, 600,
                 TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
 
-        ScheduledThreadPoolExecutor heartbeatExecutor = new ScheduledThreadPoolExecutor(1);
-        ScheduledThreadPoolExecutor timeOutExecutor = new ScheduledThreadPoolExecutor(1);
-
         this.peerSet = peerSet;
 
+        initTask();
 
+    }
+
+    public void initTask(){
+        ScheduledThreadPoolExecutor heartbeatExecutor = new ScheduledThreadPoolExecutor(1);
+        ScheduledThreadPoolExecutor timeOutExecutor = new ScheduledThreadPoolExecutor(1);
         heartbeatExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -116,6 +118,7 @@ public class NodeImpl implements Node {
                     log.info("heartbeat,not leader");
                     return ;
                 }
+                log.info("leader");
                 List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
                 for (Peer peer : peerSet) {
                     callableList.add(heartBeatResult(peer));
@@ -123,37 +126,50 @@ public class NodeImpl implements Node {
                 try {
                     List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
                     for(Future<Boolean> heartBeatRes :resList){
-                       if(heartBeatRes.get()){
-                           //todo 重试
-                           log.error("error");
-                       };
-                    }
-                } catch (Exception e) {
-                    log.error("heart invoke all error");
-                }
-            }
-        },1000,5,TimeUnit.SECONDS);
-        timeOutExecutor.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                if(System.currentTimeMillis()-lastHeartBeatTime>timeout){
-                log.info("timeout");
-                List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
-                for (Peer peer : peerSet) {
-                    callableList.add(voteResult(peer));
-                }
-                try {
-                    List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
-                    for(Future<Boolean> heartBeatRes :resList){
                         if(!heartBeatRes.get()){
                             //todo 重试
-                            log.error("rpc res false error");
+                            log.error(" heart beat error");
                         };
                     }
                 } catch (Exception e) {
                     log.error("heart invoke all error");
                 }
-            }}
+            }
+        },0,1,TimeUnit.SECONDS);
+        timeOutExecutor.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                if(System.currentTimeMillis()-Metadata.lastHeartBeatTime>timeout){
+                    log.info("timeout");
+
+                    List<Callable<Boolean>> callableList = new ArrayList<>(peerSet.size());
+                    for (Peer peer : peerSet) {
+                        callableList.add(voteResult(peer));
+                    }
+                    try {
+                        List<Future<Boolean>> resList = raftThreadPoolExecutor.invokeAll(callableList);
+                        int quorum = peerSet.size()/2;
+                        int curVote = 0;
+                        for(Future<Boolean> heartBeatRes :resList){
+                            if(!heartBeatRes.get()){
+                                //todo 重试
+                                log.error("获取选票失败");
+                            }else{
+                                log.info("成功获取选票");
+                                curVote++;
+                            }
+                        }
+                        if(curVote>=quorum){
+                            Metadata.status = LEADER;
+                        }
+
+                    } catch (Exception e) {
+                        log.error("heart invoke all error");
+                    }
+
+
+
+                }}
         },0,10,TimeUnit.SECONDS);
     }
 
@@ -293,6 +309,7 @@ public class NodeImpl implements Node {
     }
 
 
+
     private Callable<Boolean> heartBeatResult(Peer p){
         return () -> {
                 AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
@@ -305,11 +322,8 @@ public class NodeImpl implements Node {
                     AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
                     if(appendEntriesResp.getSuccess()){
 
-                        reentrantLock.lock();
                         long currentTime = System.currentTimeMillis();
-                        lastHeartBeatTime = Math.max(currentTime,lastHeartBeatTime);
-                        reentrantLock.unlock();
-
+                        Metadata.lastHeartBeatTime = Math.max(currentTime,Metadata.lastHeartBeatTime);
                         return true;
                     }
                 } catch (Exception e) {
@@ -322,9 +336,10 @@ public class NodeImpl implements Node {
 
     private Callable<Boolean> voteResult(Peer p){
         return () -> {
-            if(Metadata.status==NodeStatus.FOLLOWER){
+            if(Metadata.status!= LEADER){
                 RequestVoteReqs requestVoteReqs = new RequestVoteReqs();
-                requestVoteReqs.setTerm(Metadata.currentTerm+1);
+                Metadata.currentTerm +=1;
+                requestVoteReqs.setTerm(Metadata.currentTerm);
                 requestVoteReqs.setCandidateId(Metadata.addr);
                 requestVoteReqs.setLastLogIndex(Metadata.commitIndex);
 

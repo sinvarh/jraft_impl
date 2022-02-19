@@ -1,6 +1,7 @@
 package main;
 
 
+import lombok.extern.slf4j.Slf4j;
 import main.config.Metadata;
 import main.config.NodeStatus;
 import main.model.log.LogEntry;
@@ -12,6 +13,7 @@ import main.model.rpc.RequestVoteResp;
 /**
  * @author sinvar
  */
+@Slf4j
 public class ConsensusImpl implements Consensus {
 
     private LogModule logModule;
@@ -87,6 +89,11 @@ public class ConsensusImpl implements Consensus {
         //心跳
         if (reqs.getEntries() == null || reqs.getEntries().isEmpty()) {
             res.setSuccess(true);
+            log.info("收到心跳");
+            //todo 这里加不加锁印象不是很大
+            long currentTime = System.currentTimeMillis();
+            Metadata.lastHeartBeatTime = Math.max(currentTime,Metadata.lastHeartBeatTime);
+
             return res;
         }
         //不是心跳,非第一次

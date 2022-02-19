@@ -42,4 +42,9 @@ public class Metadata {
      *自己的地址
      */
     public static String addr;
+
+    /**
+     * 上次心跳的时间
+     */
+    public static   volatile long lastHeartBeatTime = 0;
 }
