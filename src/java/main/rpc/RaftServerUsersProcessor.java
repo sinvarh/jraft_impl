@@ -30,10 +30,10 @@ public class RaftServerUsersProcessor extends SyncUserProcessor<RaftRpcReq> {
         System.out.println(request.getData());
         //todo if else 的优化
         if (request.getType() == CommandType.vote.getType()) {
-            consensus.requestVote((RequestVoteReqs) request.getData());
+            return consensus.requestVote((RequestVoteReqs) request.getData());
         }
         if (request.getType() == CommandType.appendLog.getType()) {
-            consensus.appendEntries((AppendEntriesReqs) request.getData());
+            return consensus.appendEntries((AppendEntriesReqs) request.getData());
         }
         return new RaftRpcResp(Constants.commandNotFind, null);
     }
