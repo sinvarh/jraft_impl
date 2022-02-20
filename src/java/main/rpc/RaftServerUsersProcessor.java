@@ -4,8 +4,11 @@ import com.alipay.remoting.BizContext;
 import com.alipay.remoting.rpc.protocol.SyncUserProcessor;
 import main.Consensus;
 import main.DefaultLogModule;
+import main.Node;
 import main.constant.CommandType;
 import main.constant.Constants;
+import main.model.app.KVReqs;
+import main.model.app.KVResp;
 import main.model.rpc.AppendEntriesReqs;
 import main.model.rpc.RequestVoteReqs;
 import main.model.rpc.common.RaftRpcReq;
@@ -19,10 +22,11 @@ import main.model.rpc.common.RaftRpcResp;
  */
 public class RaftServerUsersProcessor extends SyncUserProcessor<RaftRpcReq> {
 
-    private Consensus consensus;
+    private Node node;
 
-    public RaftServerUsersProcessor(Consensus consensus) {
-        this.consensus = consensus;
+    public RaftServerUsersProcessor (Node node) {
+
+        this.node = node;
     }
 
     @Override
@@ -30,10 +34,16 @@ public class RaftServerUsersProcessor extends SyncUserProcessor<RaftRpcReq> {
         System.out.println(request.getData());
         //todo if else 的优化
         if (request.getType() == CommandType.vote.getType()) {
-            return consensus.requestVote((RequestVoteReqs) request.getData());
+            return node.handlerRequestVote((RequestVoteReqs) request.getData());
         }
         if (request.getType() == CommandType.appendLog.getType()) {
-            return consensus.appendEntries((AppendEntriesReqs) request.getData());
+            return node.handleAppendEntries((AppendEntriesReqs) request.getData());
+        }
+        if(request.getType() == CommandType.addKv.getType()){
+            return node.handleClientWriteRequest((KVReqs) request.getData());
+        }
+        if(request.getType() == CommandType.readKv.getType()){
+            return node.handleClientReadRequest((KVReqs) request.getData());
         }
         return new RaftRpcResp(Constants.commandNotFind, null);
     }

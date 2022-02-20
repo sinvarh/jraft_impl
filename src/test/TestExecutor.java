@@ -60,7 +60,7 @@ public class TestExecutor {
         return () -> {
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
             appendEntriesReqs.setTerm(Metadata.currentTerm);
-            appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
+            appendEntriesReqs.setLeaderId(Metadata.voteFor);
             appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
 
             RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), appendEntriesReqs);

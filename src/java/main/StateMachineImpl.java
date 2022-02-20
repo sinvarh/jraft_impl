@@ -9,6 +9,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import java.io.File;
+import java.util.Arrays;
 
 /**
  * 复制状态机interface
@@ -49,5 +50,15 @@ public class StateMachineImpl implements StateMachine {
         } catch (RocksDBException e) {
             log.error("error", e);
         }
+    }
+
+    @Override
+    public String read(String key) {
+        try {
+            return new String(db.get(key.getBytes()));
+        } catch (RocksDBException e) {
+            log.error("read error",e);
+        }
+        return null;
     }
 }

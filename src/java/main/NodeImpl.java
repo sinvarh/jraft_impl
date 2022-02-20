@@ -51,8 +51,6 @@ public class NodeImpl implements Node {
      */
     public long lastApplied = 0;
 
-    public int status = NodeStatus.FOLLOWER;
-
     /**
      * 每个节点的地址
      */
@@ -63,12 +61,12 @@ public class NodeImpl implements Node {
     /**
      * 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
      */
-    public Map<Peer, Long> nextIndexMap;
+    public Map<Peer, Long> nextIndexMap = new HashMap<>();
 
     /**
      * 对于每一个服务器，已经复制给他的日志的最高索引值。用来更新commitIndex
      */
-    public Map<Peer, Long> matchIndexMap;
+    public Map<Peer, Long> matchIndexMap = new HashMap<>();
 
 
     /**
@@ -95,7 +93,7 @@ public class NodeImpl implements Node {
         consensus = new ConsensusImpl(logModule, stateMachine);
 
         //rpc 模块初始化
-        raftRpcServer = new RaftRpcServer(port, consensus);
+        raftRpcServer = new RaftRpcServer(port, this);
         raftRpcClient = RaftRpcClient.getClient();
 
         //todo 优化参数
@@ -103,6 +101,7 @@ public class NodeImpl implements Node {
                 TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.AbortPolicy());
 
         this.peerSet = peerSet;
+        Metadata.addr =  "127.0.0.1:"+port;
 
         initTask();
 
@@ -161,6 +160,7 @@ public class NodeImpl implements Node {
                         }
                         if(curVote>=quorum){
                             Metadata.status = LEADER;
+                            Metadata.voteFor = Metadata.addr;
                         }
 
                     } catch (Exception e) {
@@ -215,9 +215,9 @@ public class NodeImpl implements Node {
      * @return
      */
     @Override
-    public KVResp handleClientRequest(KVReqs reqs) {
+    public KVResp handleClientWriteRequest(KVReqs reqs) {
 
-        if (status != LEADER) {
+        if (Metadata.status != LEADER) {
             return new KVResp(-1, "not leader");
         }
 
@@ -262,6 +262,12 @@ public class NodeImpl implements Node {
         return new KVResp(0, "success");
     }
 
+    @Override
+    public KVResp handleClientReadRequest(KVReqs reqs) {
+        //todo 读取是否实现线性一致性
+        return new KVResp(0,stateMachine.read(reqs.getKey()));
+    }
+
 
     // 复制到其他机器上
     private Callable<Boolean> replicateResult(Peer p, LogEntry logEntry) {
@@ -269,8 +275,9 @@ public class NodeImpl implements Node {
 
             AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
             appendEntriesReqs.setEntries(Collections.singletonList(logEntry));
-            appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
+            appendEntriesReqs.setLeaderId(Metadata.voteFor);
             appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
+            appendEntriesReqs.setTerm(Metadata.currentTerm);
             //如果是第一次，perIndex是0
             LogEntry preLogEntry = logModule.read(logEntry.getIndex() - 1);
             if (preLogEntry != null) {
@@ -280,12 +287,13 @@ public class NodeImpl implements Node {
                 appendEntriesReqs.setPrevLogIndex(0);
             }
 
+
             RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), appendEntriesReqs);
             //构造函数
             AppendEntriesResp appendEntriesResp = (AppendEntriesResp) raftRpcClient.invokeSync(p.getAddr(), req, 3000);
             if (appendEntriesResp.getTerm() > Metadata.currentTerm) {
                 //变成follower
-                status = FOLLOWER;
+                Metadata.status = FOLLOWER;
                 Metadata.currentTerm = appendEntriesResp.getTerm();
                 return false;
             }
@@ -314,7 +322,7 @@ public class NodeImpl implements Node {
         return () -> {
                 AppendEntriesReqs appendEntriesReqs = new AppendEntriesReqs();
                 appendEntriesReqs.setTerm(Metadata.currentTerm);
-                appendEntriesReqs.setLeaderId(Metadata.leaderAddr);
+                appendEntriesReqs.setLeaderId(Metadata.voteFor);
                 appendEntriesReqs.setLeaderCommit(Metadata.commitIndex);
 
                 RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), appendEntriesReqs);

@@ -18,6 +18,7 @@ package main.rpc;
 
 
 import main.Consensus;
+import main.Node;
 
 /**
  * a demo for rpc server, you can just run the main method to start a server
@@ -27,8 +28,8 @@ import main.Consensus;
  */
 public class RaftRpcServer {
 
-    public RaftRpcServer(int port, Consensus consensus) {
-        RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor(consensus);
+    public RaftRpcServer(int port, Node node) {
+        RaftServerUsersProcessor raftServerUsersProcessor = new RaftServerUsersProcessor(node);
 
         // 1. create a Rpc server with port assigned
         BoltServer server = new BoltServer(port);

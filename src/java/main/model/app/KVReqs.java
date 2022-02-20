@@ -1,6 +1,10 @@
 package main.model.app;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
 
 /**
  * @program: jraft
@@ -9,11 +13,9 @@ import lombok.Data;
  * @create: 2022-01-10 13:23
  */
 @Data
-public class KVReqs {
-    /**
-     * 读还是写请求
-     */
-    private int type;
+@AllArgsConstructor
+@NoArgsConstructor
+public class KVReqs implements Serializable {
     private String key;
     private String value;
 }

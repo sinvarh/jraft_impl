@@ -23,7 +23,16 @@ public interface Node {
     AppendEntriesResp handleAppendEntries(AppendEntriesReqs reqs);
 
     /**
-     * 客户端请求
+     * 客户端写请求
      */
-    KVResp handleClientRequest(KVReqs reqs);
+    KVResp handleClientWriteRequest(KVReqs reqs);
+
+    /**
+     * 客户端读请求
+     * @param reqs
+     * @return
+     */
+    KVResp handleClientReadRequest(KVReqs reqs);
+
+
 }

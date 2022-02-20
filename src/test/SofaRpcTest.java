@@ -5,6 +5,8 @@ import main.config.Metadata;
 import main.config.RaftThreadPoolExecutor;
 import main.constant.CommandType;
 import main.entity.Peer;
+import main.model.app.KVReqs;
+import main.model.app.KVResp;
 import main.model.log.LogEntry;
 import main.model.rpc.AppendEntriesReqs;
 import main.model.rpc.AppendEntriesResp;
@@ -15,6 +17,7 @@ import main.rpc.RaftRpcServer;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -35,7 +38,7 @@ public class SofaRpcTest {
         logModule = new DefaultLogModule(serverPort);
         stateMachine = new StateMachineImpl(serverPort);
         consensus = new ConsensusImpl(logModule, stateMachine);
-        raftRpcServer = new RaftRpcServer(serverPort, consensus);
+//        raftRpcServer = new RaftRpcServer(serverPort, );
 
 
     }
@@ -46,10 +49,9 @@ public class SofaRpcTest {
         List<LogEntry> list = Collections.singletonList(new LogEntry(2L, 1, new LogEntry.Command("1111", "2222")));
         AppendEntriesReqs reqs = new AppendEntriesReqs(1, "127.0.0.1:9001", 1, 1, list, 2);
 
-    //        RaftRpcReq req = new RaftRpcReq(CommandType.appendLog.getType(), reqs);
-    //        RaftRpcResp appendEntriesResp = (RaftRpcResp) RaftRpcClient.getClient().invokeSync(addr, req, 300000);
-        AppendEntriesResp resp = consensus.appendEntries(reqs);
-        RaftRpcClient.getClient().shutdown();
+//        RaftRpcReq(type=2, data=AppendEntriesReqs(term=0, leaderId=127.0.0.19001, prevLogIndex=0, prevLogTerm=0, entries=[LogEntry(index=1, term=20, command=LogEntry.Command(key=key, value=value))], leaderCommit=0))
+//        AppendEntriesResp resp = consensus.appendEntries(reqs);
+//        RaftRpcClient.getClient().shutdown();
     }
 
     @Test
@@ -103,6 +105,26 @@ public class SofaRpcTest {
 
 //        RaftRpcReq(type=2, data=AppendEntriesReqs(term=1000000, leaderId=null, prevLogIndex=0, prevLogTerm=0, entries=null, leaderCommit=0))
 
+    @Test
+    public void kevWriteTest() {
+        Peer p = new Peer("127.0.0.1:9002");
 
+        KVReqs kvReqs = new KVReqs("test","value");
+
+
+        KVResp kvResp = null;
+        RaftRpcReq  raftWriteRpcReq = new RaftRpcReq(CommandType.addKv.getType(),kvReqs);
+        RaftRpcReq  raftReadRpcReq = new RaftRpcReq(CommandType.readKv.getType(),kvReqs);
+
+        try {
+            kvResp = (KVResp) RaftRpcClient.getClient().invokeSync(p.getAddr(), raftWriteRpcReq, 3000);
+            log.info(kvResp.getMsg());
+            kvResp = (KVResp) RaftRpcClient.getClient().invokeSync(p.getAddr(), raftReadRpcReq, 3000);
+            log.info(kvResp.getMsg());
+        } catch (InterruptedException | RemotingException e) {
+            e.printStackTrace();
+        }
+
+    }
 
 }

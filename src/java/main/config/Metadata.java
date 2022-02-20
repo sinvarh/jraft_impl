@@ -15,7 +15,7 @@ public class Metadata {
     /**
      * votedFor	当前任期内收到选票的 candidateId，如果没有投给任何候选人 则为空
      */
-    public static String voteFor;
+    public static volatile String voteFor;
 
     /**
      * 已知的最大的已经被提交的日志条目的索引值，
@@ -31,17 +31,12 @@ public class Metadata {
     /**
      * 当前状态
      */
-    public static int status = NodeStatus.FOLLOWER;
-
-    /**
-     * leader 地址
-     */
-    public static String leaderAddr;
+    public static volatile int status = NodeStatus.FOLLOWER;
 
     /**
      *自己的地址
      */
-    public static String addr;
+    public static volatile String addr;
 
     /**
      * 上次心跳的时间
